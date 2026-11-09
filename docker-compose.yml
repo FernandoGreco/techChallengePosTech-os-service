@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: os_service
+      POSTGRES_USER: os_service
+      POSTGRES_PASSWORD: os_local_only
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - os_service_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U os_service -d os_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  os_service_postgres:

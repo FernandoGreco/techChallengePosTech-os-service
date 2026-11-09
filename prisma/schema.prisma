@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Cliente {
+  id            String         @id @default(uuid())
+  nome          String
+  documento     String         @unique
+  tipoDocumento TipoDocumento  @map("tipo_documento")
+  telefone      String
+  email         String
+  ativo         Boolean        @default(true)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  ordensServico OrdemServico[]
+  veiculos      Veiculo[]
+
+  @@map("clientes")
+}
+
+model Veiculo {
+  id            String         @id @default(uuid())
+  placa         String         @unique
+  marca         String
+  modelo        String
+  ano           Int
+  clienteId     String         @map("cliente_id")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  ordensServico OrdemServico[]
+  cliente       Cliente        @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+
+  @@index([clienteId])
+  @@map("veiculos")
+}
+
+model OrdemServico {
+  id                    String              @id @default(uuid())
+  numero                Int                 @unique @default(autoincrement())
+  clienteId             String              @map("cliente_id")
+  veiculoId             String              @map("veiculo_id")
+  status                StatusOS            @default(RECEBIDA)
+  diagnostico           String?
+  dataCriacao           DateTime            @default(now()) @map("data_criacao")
+  dataInicioDiagnostico DateTime?           @map("data_inicio_diagnostico")
+  dataInicioExecucao    DateTime?           @map("data_inicio_execucao")
+  dataFinalizacao       DateTime?           @map("data_finalizacao")
+  dataEntrega           DateTime?           @map("data_entrega")
+  version               Int                 @default(0)
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+  historico             HistoricoStatusOS[]
+  saga                  SagaInstance?
+  cliente               Cliente             @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  veiculo               Veiculo             @relation(fields: [veiculoId], references: [id], onDelete: Restrict)
+
+  @@index([clienteId, createdAt])
+  @@map("ordens_servico")
+}
+
+model HistoricoStatusOS {
+  id             String       @id @default(uuid())
+  ordemServicoId String       @map("ordem_servico_id")
+  statusAnterior StatusOS?    @map("status_anterior")
+  statusNovo     StatusOS     @map("status_novo")
+  observacao     String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  ordemServico   OrdemServico @relation(fields: [ordemServicoId], references: [id], onDelete: Cascade)
+
+  @@index([ordemServicoId, createdAt])
+  @@map("historico_status_os")
+}
+
+model SagaInstance {
+  id             String       @id @default(uuid())
+  ordemServicoId String       @unique @map("ordem_servico_id")
+  status         SagaStatus   @default(STARTED)
+  version        Int          @default(0)
+  failureReason  String?      @map("failure_reason")
+  startedAt      DateTime     @default(now()) @map("started_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  ordemServico   OrdemServico @relation(fields: [ordemServicoId], references: [id], onDelete: Cascade)
+
+  @@index([status, updatedAt])
+  @@map("saga_instances")
+}
+
+model OutboxEvent {
+  id            String    @id
+  eventType     String    @map("event_type")
+  eventVersion  Int       @map("event_version")
+  aggregateId   String    @map("aggregate_id")
+  correlationId String    @map("correlation_id")
+  causationId   String?   @map("causation_id")
+  payload       Json
+  occurredAt    DateTime  @map("occurred_at")
+  publishedAt   DateTime? @map("published_at")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now()) @map("next_attempt_at")
+  lastError     String?   @map("last_error")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([publishedAt, nextAttemptAt])
+  @@map("outbox_events")
+}
+
+model InboxEvent {
+  eventId       String   @id @map("event_id")
+  eventType     String   @map("event_type")
+  aggregateId   String   @map("aggregate_id")
+  correlationId String   @map("correlation_id")
+  processedAt   DateTime @default(now()) @map("processed_at")
+
+  @@index([aggregateId, processedAt])
+  @@map("inbox_events")
+}
+
+enum TipoDocumento {
+  CPF
+  CNPJ
+}
+
+enum StatusOS {
+  RECEBIDA
+  EM_DIAGNOSTICO
+  AGUARDANDO_APROVACAO
+  EM_EXECUCAO
+  FINALIZADA
+  ENTREGUE
+}
+
+enum SagaStatus {
+  STARTED
+  WAITING_FOR_QUOTE
+  WAITING_FOR_APPROVAL
+  RESERVING_STOCK
+  WAITING_FOR_PAYMENT
+  WAITING_FOR_EXECUTION
+  COMPLETED
+  COMPENSATING
+  FAILED
+}
