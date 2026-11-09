@@ -1,0 +1,601 @@
+openapi: 3.0.3
+info:
+  title: OS Service API
+  version: 1.0.0
+  description: >-
+    Contrato inicial da API HTTP implementada pelo OS Service. Os contratos de
+    eventos entre serviços não estão definidos neste documento e dependem de
+    aprovação dos responsáveis por OS, Auth, Billing e Execução.
+servers:
+  - url: http://localhost:3000
+    description: Execução local
+tags:
+  - name: Health
+  - name: Clientes
+  - name: Ordens de Serviço
+  - name: Consulta interna
+paths:
+  /health/live:
+    get:
+      tags: [Health]
+      operationId: healthLive
+      summary: Verifica se o processo está ativo
+      responses:
+        '200':
+          description: Processo ativo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /health/ready:
+    get:
+      tags: [Health]
+      operationId: healthReady
+      summary: Verifica se o serviço consegue acessar o banco
+      responses:
+        '200':
+          description: Banco acessível
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/clientes:
+    post:
+      tags: [Clientes]
+      operationId: cadastrarCliente
+      summary: Cadastra um cliente
+      description: Requer staff com papel ADMIN ou ATENDENTE.
+      security:
+        - BearerJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CadastrarCliente'
+      responses:
+        '201':
+          description: Cliente cadastrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClienteCriado'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Já existe cliente com esse documento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+
+  /api/v1/clientes/{clienteId}/veiculos:
+    post:
+      tags: [Clientes]
+      operationId: cadastrarVeiculo
+      summary: Cadastra um veículo para um cliente
+      description: Requer staff com papel ADMIN ou ATENDENTE.
+      security:
+        - BearerJwt: []
+      parameters:
+        - name: clienteId
+          in: path
+          required: true
+          description: UUID do cliente proprietário do veículo
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CadastrarVeiculo'
+      responses:
+        '201':
+          description: Veículo cadastrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VeiculoCriado'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Cliente não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '409':
+          description: Já existe veículo com essa placa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+
+  /api/v1/ordens-servico:
+    post:
+      tags: [Ordens de Serviço]
+      operationId: abrirOrdemServico
+      summary: Abre uma ordem de serviço
+      description: >-
+        Cliente autenticado abre a OS para o próprio cadastro; o clienteId é
+        obtido do JWT. Para staff, clienteId deve ser enviado no corpo.
+      security:
+        - BearerJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AbrirOrdemServico'
+      responses:
+        '201':
+          description: Ordem de serviço aberta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdemServicoDetalhe'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Cliente inativo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '404':
+          description: Cliente ou veículo não encontrado para o cliente informado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+
+  /api/v1/ordens-servico/{id}:
+    get:
+      tags: [Ordens de Serviço]
+      operationId: consultarOrdemServico
+      summary: Consulta uma ordem de serviço
+      description: >-
+        Cliente só pode consultar uma OS própria. Staff autenticado pode
+        consultar qualquer OS.
+      security:
+        - BearerJwt: []
+      parameters:
+        - $ref: '#/components/parameters/OrdemServicoId'
+      responses:
+        '200':
+          description: Detalhes da ordem de serviço
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdemServicoDetalhe'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Ordem não encontrada ou não pertence ao cliente autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+
+  /api/v1/ordens-servico/{id}/status:
+    get:
+      tags: [Ordens de Serviço]
+      operationId: consultarStatusOrdemServico
+      summary: Consulta o status de uma ordem de serviço
+      description: Cliente só pode consultar o status de uma OS própria.
+      security:
+        - BearerJwt: []
+      parameters:
+        - $ref: '#/components/parameters/OrdemServicoId'
+      responses:
+        '200':
+          description: Status atual da ordem de serviço
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOrdemServico'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Ordem não encontrada ou não pertence ao cliente autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+
+  /api/v1/ordens-servico/{id}/diagnostico:
+    patch:
+      tags: [Ordens de Serviço]
+      operationId: registrarDiagnostico
+      summary: Registra o diagnóstico da ordem de serviço
+      description: Requer staff com papel ADMIN ou MECANICO.
+      security:
+        - BearerJwt: []
+      parameters:
+        - $ref: '#/components/parameters/OrdemServicoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrarDiagnostico'
+      responses:
+        '200':
+          description: Diagnóstico registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdemServicoDetalhe'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Ordem de serviço não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '409':
+          description: Conflito de estado ou concorrência ao atualizar a ordem ou a Saga
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+
+  /internal/v1/clientes/lookup:
+    post:
+      tags: [Consulta interna]
+      operationId: consultarClientePorCpf
+      summary: Localiza um cliente ativo por CPF
+      description: >-
+        Rota interna para integração serviço-a-serviço. Não deve ser exposta no
+        API Gateway público. O mecanismo de token compartilhado é provisório e
+        depende de alinhamento com Auth.
+      security:
+        - InternalServiceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsultarClientePorCpf'
+      responses:
+        '200':
+          description: Cliente ativo localizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClienteLookup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Cliente inativo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '404':
+          description: Cliente não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+        '503':
+          description: Credencial serviço-a-serviço não configurada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpError'
+
+components:
+  securitySchemes:
+    BearerJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        JWT HS256 com issuer oficina-auth-lambda para clientes ou oficina-staff
+        para staff. Tokens de staff também devem conter papel ADMIN, ATENDENTE
+        ou MECANICO.
+    InternalServiceToken:
+      type: apiKey
+      in: header
+      name: x-internal-service-token
+      description: Credencial interna provisória; não é uma credencial de usuário.
+  parameters:
+    OrdemServicoId:
+      name: id
+      in: path
+      required: true
+      description: UUID da ordem de serviço
+      schema:
+        type: string
+        format: uuid
+  responses:
+    BadRequest:
+      description: Corpo inválido, UUID inválido ou regra de negócio não atendida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HttpError'
+    Unauthorized:
+      description: Token ausente, inválido ou expirado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HttpError'
+    Forbidden:
+      description: Papel insuficiente para executar a operação
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HttpError'
+    ServiceUnavailable:
+      description: Dependência indisponível
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HttpError'
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+    CadastrarCliente:
+      type: object
+      additionalProperties: false
+      required: [nome, documento, tipoDocumento, telefone, email]
+      properties:
+        nome:
+          type: string
+          maxLength: 160
+        documento:
+          type: string
+          description: >-
+            CPF (11 dígitos) ou CNPJ (14 dígitos), válido para o tipo informado.
+            Pontuação é removida antes da validação.
+        tipoDocumento:
+          type: string
+          enum: [CPF, CNPJ]
+        telefone:
+          type: string
+          pattern: '^[0-9+() -]{8,20}$'
+        email:
+          type: string
+          format: email
+          maxLength: 254
+    ClienteCriado:
+      type: object
+      required: [id, nome, email]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nome:
+          type: string
+        email:
+          type: string
+          format: email
+    CadastrarVeiculo:
+      type: object
+      additionalProperties: false
+      required: [placa, marca, modelo, ano]
+      properties:
+        placa:
+          type: string
+          description: >-
+            Placa Mercosul. Separadores são removidos e o valor é convertido
+            para maiúsculas antes da validação.
+          example: ABC1D23
+        marca:
+          type: string
+          maxLength: 80
+        modelo:
+          type: string
+          maxLength: 120
+        ano:
+          type: integer
+          minimum: 1900
+          maximum: 2100
+    VeiculoCriado:
+      type: object
+      required: [id, clienteId, placa, marca, modelo, ano]
+      properties:
+        id:
+          type: string
+          format: uuid
+        clienteId:
+          type: string
+          format: uuid
+        placa:
+          type: string
+          pattern: '^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$'
+        marca:
+          type: string
+        modelo:
+          type: string
+        ano:
+          type: integer
+    AbrirOrdemServico:
+      type: object
+      additionalProperties: false
+      required: [veiculoId]
+      properties:
+        veiculoId:
+          type: string
+          format: uuid
+        clienteId:
+          type: string
+          format: uuid
+          description: >-
+            Obrigatório para staff. Para cliente, o vínculo vem do JWT e este
+            campo não substitui a identidade autenticada.
+    StatusOS:
+      type: string
+      enum:
+        - RECEBIDA
+        - EM_DIAGNOSTICO
+        - AGUARDANDO_APROVACAO
+        - EM_EXECUCAO
+        - FINALIZADA
+        - ENTREGUE
+    StatusOrdemServico:
+      type: object
+      required: [id, numero, status, dataCriacao]
+      properties:
+        id:
+          type: string
+          format: uuid
+        numero:
+          type: integer
+        status:
+          $ref: '#/components/schemas/StatusOS'
+        dataCriacao:
+          type: string
+          format: date-time
+    OrdemServicoDetalhe:
+      type: object
+      required:
+        - id
+        - numero
+        - clienteId
+        - veiculoId
+        - status
+        - diagnostico
+        - dataCriacao
+        - cliente
+        - veiculo
+        - historico
+      properties:
+        id:
+          type: string
+          format: uuid
+        numero:
+          type: integer
+        clienteId:
+          type: string
+          format: uuid
+        veiculoId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/StatusOS'
+        diagnostico:
+          type: string
+          nullable: true
+        dataCriacao:
+          type: string
+          format: date-time
+        cliente:
+          type: object
+          required: [id, nome]
+          properties:
+            id:
+              type: string
+              format: uuid
+            nome:
+              type: string
+        veiculo:
+          type: object
+          required: [id, placa, marca, modelo, ano]
+          properties:
+            id:
+              type: string
+              format: uuid
+            placa:
+              type: string
+            marca:
+              type: string
+            modelo:
+              type: string
+            ano:
+              type: integer
+        historico:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoricoStatus'
+    HistoricoStatus:
+      type: object
+      required: [id, statusAnterior, statusNovo, observacao, ocorridaEm]
+      properties:
+        id:
+          type: string
+          format: uuid
+        statusAnterior:
+          allOf:
+            - $ref: '#/components/schemas/StatusOS'
+          nullable: true
+        statusNovo:
+          $ref: '#/components/schemas/StatusOS'
+        observacao:
+          type: string
+          nullable: true
+        ocorridaEm:
+          type: string
+          format: date-time
+    RegistrarDiagnostico:
+      type: object
+      additionalProperties: false
+      required: [diagnostico]
+      properties:
+        diagnostico:
+          type: string
+          minLength: 2
+          maxLength: 2000
+    ConsultarClientePorCpf:
+      type: object
+      additionalProperties: false
+      required: [cpf]
+      properties:
+        cpf:
+          type: string
+          description: CPF com ou sem pontuação; deve resultar em 11 dígitos.
+    ClienteLookup:
+      type: object
+      required: [clienteId]
+      properties:
+        clienteId:
+          type: string
+          format: uuid
+    HttpError:
+      type: object
+      required: [statusCode, message, error]
+      properties:
+        statusCode:
+          type: integer
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        error:
+          type: string

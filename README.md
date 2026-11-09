@@ -51,9 +51,13 @@ A Outbox já possui envelope versionado, identificadores de correlação, tentat
 
 ## CI
 
-O workflow `.github/workflows/ci.yml` roda em push para `main`, pull requests direcionados à `main` e execução manual. Ele valida o schema Prisma, lint, build, cobertura mínima, testes e2e, integração com PostgreSQL 16 e dependências de produção.
+O workflow `.github/workflows/ci.yml` roda em push para `main`, pull requests direcionados à `main` e execução manual. Ele valida o formato dos contratos, schema Prisma, lint, build, cobertura mínima, testes e2e, integração com PostgreSQL 16 e dependências de produção.
 
 O workflow executa somente CI: não faz deploy nem impede push ou merge por si só. Exigir CI aprovada antes de integrar depende da configuração de proteção da branch no GitHub.
+
+## Contratos
+
+O contrato HTTP das rotas implementadas está em [`docs/api/openapi.yaml`](docs/api/openapi.yaml). O [`checklist de integração`](docs/contratos/checklist-integracao.md) é uma proposta para o grupo alinhar APIs e eventos; os eventos da Outbox ainda não são contratos aprovados.
 
 ## Validação
 
@@ -64,6 +68,7 @@ npm run test:e2e -- --runInBand
 npm run test:integration
 npm run lint
 npm audit --omit=dev
+npx prettier --check .github/workflows/ci.yml docs/api/openapi.yaml docs/contratos/checklist-integracao.md
 ```
 
 O teste e2e usa repositórios e banco simulados. `test:integration` usa PostgreSQL real, restringe a conexão a um host local e limpa os registros que cria. A validação de migration aplicada requer o PostgreSQL local ativo. `npm run db:deploy` aplica as migrations já versionadas em um ambiente de implantação.

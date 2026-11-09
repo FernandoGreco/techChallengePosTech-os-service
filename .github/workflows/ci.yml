@@ -51,6 +51,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check contract documentation formatting
+        run: npx prettier --check .github/workflows/ci.yml docs/api/openapi.yaml docs/contratos/checklist-integracao.md
+
       - name: Generate Prisma Client
         run: npm run db:generate
 
