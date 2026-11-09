@@ -7,6 +7,8 @@ Microsserviço NestJS responsável por clientes, veículos, ordens de serviço, 
 - Node.js e npm
 - Docker Desktop com o daemon Linux ativo para executar o PostgreSQL local
 
+O CI usa Node.js 22 e PostgreSQL 16.
+
 Configure o ambiente e inicialize o banco:
 
 ```powershell
@@ -47,6 +49,12 @@ A abertura da OS, o histórico inicial, a instância `STARTED` da Saga e o event
 
 A Outbox já possui envelope versionado, identificadores de correlação, tentativas e campos de agendamento. O dispatcher SNS/SQS, Inbox dos eventos recebidos, retries/DLQ e as transições acionadas por Billing/Execução ainda dependem do contrato e da infraestrutura compartilhados com os demais responsáveis; os eventos pendentes não são publicados automaticamente nesta etapa.
 
+## CI
+
+O workflow `.github/workflows/ci.yml` roda em push para `main`, pull requests direcionados à `main` e execução manual. Ele valida o schema Prisma, lint, build, cobertura mínima, testes e2e, integração com PostgreSQL 16 e dependências de produção.
+
+O workflow executa somente CI: não faz deploy nem impede push ou merge por si só. Exigir CI aprovada antes de integrar depende da configuração de proteção da branch no GitHub.
+
 ## Validação
 
 ```powershell
@@ -55,6 +63,7 @@ npm run test:cov -- --runInBand
 npm run test:e2e -- --runInBand
 npm run test:integration
 npm run lint
+npm audit --omit=dev
 ```
 
 O teste e2e usa repositórios e banco simulados. `test:integration` usa PostgreSQL real, restringe a conexão a um host local e limpa os registros que cria. A validação de migration aplicada requer o PostgreSQL local ativo. `npm run db:deploy` aplica as migrations já versionadas em um ambiente de implantação.
